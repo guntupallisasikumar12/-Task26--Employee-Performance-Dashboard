@@ -1,0 +1,98 @@
+1. How does your Axios interceptor handle an expired access token?
+When an API request is made, the Axios request interceptor first reads the access_token from localStorage. If the token exists, it attaches it to the request using the Authorization: Bearer <token> header.
+If the access token has expired, the backend returns a 401 Unauthorized response. The Axios response interceptor catches this error.
+The interceptor first checks whether the request has already been retried by checking the _retry property. This prevents an infinite refresh loop.
+If the request has not been retried, the interceptor gets the refresh_token from localStorage. It then sends a request to the /api/refresh endpoint with the refresh token in the Authorization header.
+If the refresh token is valid, the backend returns a new access token. The frontend stores the new access token in localStorage, updates the Authorization header of the original failed request, and sends that request again automatically.
+If multiple API requests fail with a 401 response at the same time, the isRefreshing variable ensures that only one refresh request is sent. The other failed requests are placed in a queue and retried after the new access token is received.
+If the refresh token is expired or invalid, the refresh request fails. In that case, the application clears both tokens from localStorage, clears the authentication state, and redirects the user to /login.
+Therefore, the complete flow is:
+1.	API request is sent with the access token.
+2.	The backend returns 401 because the access token has expired.
+3.	The response interceptor catches the 401 error.
+4.	The refresh token is sent to /api/refresh.
+5.	The backend returns a new access token.
+6.	The new token is stored in localStorage.
+7.	The original failed request is updated with the new token.
+8.	The original request is automatically retried.
+9.	If refreshing fails, the user is logged out and redirected to the login page.
+________________________________________
+2. Paste your useDebounce hook. How does cleanup prevent unnecessary API calls?
+import {
+    useEffect,
+    useState,
+} from "react";
+
+export default function useDebounce<T>(
+    value: T,
+    delay = 300
+) {
+    const [
+        debouncedValue,
+        setDebouncedValue,
+    ] = useState<T>(value);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+The useDebounce hook delays updating the final value for 300 milliseconds.
+For example, when a user searches for an employee and types the word Rahul, the value changes several times:
+R → Ra → Rah → Rahu → Rahul
+Without debouncing, the application could make an API request for every character typed.
+The cleanup function solves this problem:
+return () => {
+    clearTimeout(timer);
+};
+Every time the user types another character before the 300 milliseconds are completed, React runs the cleanup function from the previous effect. The previous timer is cancelled before it can update debouncedValue.
+Therefore, only when the user stops typing for 300 milliseconds does the final timer complete and update debouncedValue.
+The Employees page listens to debouncedSearch, not the original search value. As a result, the API is called only after the user pauses typing, which prevents unnecessary API requests and improves application performance.
+________________________________________
+3. SQL Query for Rating Distribution Pie Chart
+The SQL query used for the rating distribution pie chart is:
+SELECT
+    rating,
+    COUNT(*) AS count
+FROM performance_reviews
+GROUP BY rating;
+The performance_reviews table contains multiple review records. Each review has a rating such as:
+•	Excellent
+•	Good
+•	Average
+•	Poor
+The GROUP BY rating statement groups all records that have the same rating together.
+After grouping the records, COUNT(*) counts how many reviews belong to each rating category.
+For example, the result may be:
+Rating	Count
+Excellent	24
+Good	30
+Average	18
+Poor	8
+This result is sent from the Flask backend to the React frontend. The RatingPieChart component uses the rating field as the category name and the count field as the size of each pie slice.
+Without GROUP BY rating, SQL would return only one total count for all reviews instead of a separate count for each rating category.
+________________________________________
+4. What does ResponsiveContainer do in Recharts?
+ResponsiveContainer is a component provided by Recharts that automatically adjusts the width and height of a chart based on the size of its parent container.
+Example:
+<ResponsiveContainer
+    width="100%"
+    height={300}
+>
+    <BarChart data={data}>
+        ...
+    </BarChart>
+</ResponsiveContainer>
+The width="100%" property means that the chart uses the available width of its parent container.
+This is important because the Employee Performance Dashboard may be viewed on different screen sizes such as desktop, tablet, or mobile devices.
+Without ResponsiveContainer, a chart may have a fixed width and can overflow, become too small, or not fit correctly when the screen size changes.
+By using ResponsiveContainer, the charts automatically resize when their parent container changes size.
+Every chart in this project uses ResponsiveContainer so that the KPI analytics dashboard remains responsive and works correctly across different screen sizes.
+
